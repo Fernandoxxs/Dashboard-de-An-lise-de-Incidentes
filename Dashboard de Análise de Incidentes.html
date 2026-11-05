@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<!-- saved from url=(0052)https://fernandoxxs.github.io/Analise-de-incidentes/ -->
+<html lang="pt-BR"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Análise de Incidentes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com/">
+    <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin="">
+    <link href="./Dashboard de Análise de Incidentes_files/css2" rel="stylesheet">
+    <link rel="stylesheet" href="./Dashboard de Análise de Incidentes_files/styles.css">
+    <script src="./Dashboard de Análise de Incidentes_files/chart.umd.min.js.download"></script>
+    <script src="./Dashboard de Análise de Incidentes_files/xlsx.full.min.js.download"></script>
+  </head>
+  <body>
+    <div class="container">
+      <header class="topbar">
+        <div class="title-wrap">
+          <h1>Análise de Incidentes de Impactos</h1>
+        </div>
+        <div class="actions">
+          <label class="file-upload">
+            <input id="fileInput" type="file" accept=".csv,.xlsx,.xls">
+            <span>Importar</span>
+          </label>
+          <button id="clearDataBtn" class="secondary-btn" type="button">Limpar</button>
+        </div>
+      </header>
+
+      <section class="filters-panel card">
+        <div class="filter-group">
+          <label for="ufFilter">UF</label>
+          <select id="ufFilter"><option value="all">Todas as UFs</option></select>
+        </div>
+
+        <div class="filter-group">
+          <label for="siteTypeFilter">Tipo de site</label>
+          <select id="siteTypeFilter"><option value="all">Todos</option></select>
+        </div>
+
+        <div class="filter-group">
+          <label for="impactFilter">Tipo de impacto</label>
+          <select id="impactFilter"><option value="all">Todos</option></select>
+        </div>
+
+        <div class="filter-group date-filter">
+          <label for="dateFromFilter">Data inicial</label>
+          <div class="date-input-wrap">
+            <input id="dateFromFilter" class="date-input" type="text" inputmode="numeric" placeholder="DD/MM/AAAA" maxlength="10" autocomplete="off" disabled="">
+            <button class="date-picker-trigger" type="button" aria-label="Abrir calendário para data inicial" disabled="">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M16 3v4M8 3v4M3 10h18"></path></svg>
+            </button>
+            <input id="dateFromPicker" class="date-picker-native" type="date" tabindex="-1" aria-label="Selecionar data inicial" disabled="">
+          </div>
+        </div>
+
+        <div class="filter-group date-filter">
+          <label for="dateToFilter">Data final</label>
+          <div class="date-input-wrap">
+            <input id="dateToFilter" class="date-input" type="text" inputmode="numeric" placeholder="DD/MM/AAAA" maxlength="10" autocomplete="off" disabled="">
+            <button class="date-picker-trigger" type="button" aria-label="Abrir calendário para data final" disabled="">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M16 3v4M8 3v4M3 10h18"></path></svg>
+            </button>
+            <input id="dateToPicker" class="date-picker-native" type="date" tabindex="-1" aria-label="Selecionar data final" disabled="">
+          </div>
+        </div>
+        <p id="dateFilterHint" class="filter-hint">Esta planilha não contém uma coluna de data reconhecida; o filtro por data está indisponível.</p>
+      </section>
+
+      <section class="stats-grid">
+        <article class="stat-card impact">
+          <div class="stat-label">Total de impactos</div>
+          <div id="totalImpactos" class="stat-value">0</div>
+        </article>
+
+        <article class="stat-card infrastructure">
+          <div class="stat-label">Incidentes infraestrutura</div>
+          <div id="totalInfra" class="stat-value">0</div>
+        </article>
+
+        <article class="stat-card corrected">
+          <div class="stat-label">Incidentes corrigidos</div>
+          <div id="totalCorrigidos" class="stat-value">0</div>
+        </article>
+
+        <article class="stat-card date-card">
+          <div id="deviceDateValue" class="stat-value stat-date-value">Quinta-feira, 05 de novembro de 2026</div>
+        </article>
+      </section>
+
+      <section class="charts-grid">
+        <article class="panel chart-panel pie-panel">
+          <div class="panel-header">
+            <h2>Contagem de impactos por UF</h2>
+          </div>
+          <div class="chart-wrap pie-chart-wrap">
+            <canvas id="impactByUfChart" width="520" height="300" style="display: block; box-sizing: border-box; height: 300px; width: 520px;"></canvas>
+          </div>
+          <div class="summary-box" id="summaryImpactByUf">Concentração: sem dados.</div>
+        </article>
+
+        <article class="panel chart-panel">
+          <div class="panel-header">
+            <h2>Tipos de impactos</h2>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="impactTypesChart" width="568" height="300" style="display: block; box-sizing: border-box; height: 300px; width: 568px;"></canvas>
+          </div>
+          <div class="summary-box" id="summaryImpactTypes">Incidentes únicos por tipo de impacto: sem dados.</div>
+        </article>
+
+        <article class="panel chart-panel">
+          <div class="panel-header">
+            <h2>Incidentes únicos de infraestrutura por UF</h2>
+          </div>
+          <div class="chart-wrap site-chart-wrap">
+            <canvas id="uniqueInfraByUfChart" width="568" height="340" style="display: block; box-sizing: border-box; height: 340px; width: 568px;"></canvas>
+          </div>
+          <div class="summary-box" id="summaryUniqueInfraByUf">UFs com mais incidentes únicos de infraestrutura: sem dados.</div>
+        </article>
+
+        <article class="panel chart-panel">
+          <div class="panel-header">
+            <h2>Impacto por tipo de site</h2>
+          </div>
+          <div class="chart-wrap site-chart-wrap">
+            <canvas id="impactBySiteChart" width="568" height="340" style="display: block; box-sizing: border-box; height: 340px; width: 568px;"></canvas>
+          </div>
+          <div class="summary-box" id="summaryImpactBySite">Tipos de site mais impactados: sem dados.</div>
+        </article>
+
+        <article class="panel chart-panel wide">
+          <div class="panel-header">
+            <h2>Impactos e incidentes únicos de infraestrutura por UF</h2>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="impactVsInfraChart" width="1191" height="300" style="display: block; box-sizing: border-box; height: 300px; width: 1191px;"></canvas>
+          </div>
+          <div class="summary-box" id="summaryImpactVsInfra">Impactos por incidente único de infraestrutura: sem dados.</div>
+        </article>
+
+        <article class="panel table-panel wide">
+          <div class="panel-header split-row">
+            <h2>Analítico</h2>
+            <div class="table-header-actions">
+              <button id="exportAnalyticalBtn" class="export-btn" type="button" disabled="">Extrair</button>
+              <div class="filter-group table-filter">
+                <label for="tableUfFilter">Filtrar tabela por UF</label>
+                <select id="tableUfFilter"><option value="all">Todas as UFs</option></select>
+              </div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead id="infraTableHead"></thead>
+              <tbody id="infraTableBody"><tr><td colspan="1">Nenhum dado importado.</td></tr></tbody>
+            </table>
+          </div>
+          <div class="summary-box" id="summaryInfraTable">Linhas exibidas: 0 de 0 (todas as UFs). A área da tabela mostra até 10 linhas; use a rolagem para ver as demais.</div>
+        </article>
+      </section>
+
+      <section class="panel image-panel">
+        <div class="panel-header split-row">
+          <h2>Campo de imagem</h2>
+          <div class="image-actions">
+            <label class="file-upload image-upload">
+              <input id="imageInput" type="file" accept="image/*">
+              <span>Importar</span>
+            </label>
+            <button id="clearImageBtn" class="secondary-btn" type="button">Limpar imagem</button>
+          </div>
+        </div>
+        <div class="image-preview-area">
+          <img id="uploadedImage" alt="Imagem importada" hidden="">
+          <div id="noImagePlaceholder" class="placeholder">Nenhuma imagem importada.</div>
+        </div>
+        <div class="summary-box" id="summaryImage" hidden=""></div>
+      </section>
+    </div>
+
+    <script src="./Dashboard de Análise de Incidentes_files/app.js.download"></script>
+  
+
+</body></html>
