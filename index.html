@@ -1,0 +1,697 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Dashboard interativo para análise de incidentes e impactos.">
+  <title>Dashboard de Análise de Incidentes</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+      color: #172033;
+      background: #f3f6fb;
+      font-synthesis: none;
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 320px; }
+    button, input, select { font: inherit; }
+    button, .file-upload { cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: .55; }
+    .container { width: min(1440px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 40px; }
+    .topbar, .panel-header, .split-row, .actions, .image-actions, .table-header-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .topbar { margin-bottom: 22px; }
+    h1 { margin: 0; font-size: clamp(1.45rem, 3vw, 2rem); }
+    h2 { margin: 0; font-size: 1.05rem; }
+    .actions, .image-actions { flex-wrap: wrap; }
+    .file-upload, button {
+      min-height: 40px;
+      border: 1px solid #cbd5e1;
+      border-radius: 9px;
+      padding: 9px 14px;
+      background: #fff;
+      color: #26334b;
+      font-weight: 600;
+    }
+    .file-upload { display: inline-flex; align-items: center; background: #2563eb; border-color: #2563eb; color: #fff; }
+    .file-upload input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
+    .file-upload:focus-within, button:focus-visible, input:focus-visible, select:focus-visible {
+      outline: 3px solid #93c5fd;
+      outline-offset: 2px;
+    }
+    .secondary-btn { background: #fff; }
+    .export-btn { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
+    .notice { margin: 0 0 18px; border: 1px solid #bfdbfe; border-radius: 9px; padding: 11px 14px; background: #eff6ff; color: #1e3a8a; }
+    .notice.error { border-color: #fecaca; background: #fef2f2; color: #991b1b; }
+    .notice.warning { border-color: #fde68a; background: #fffbeb; color: #854d0e; }
+    .card, .panel, .stat-card { border: 1px solid #e1e7f0; border-radius: 13px; background: #fff; box-shadow: 0 3px 12px #1720330a; }
+    .filters-panel, .mapping-panel { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; padding: 18px; margin-bottom: 18px; }
+    .filter-group { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+    .filter-group label { color: #566176; font-size: .82rem; font-weight: 650; }
+    select, input[type="date"] { width: 100%; min-height: 39px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 7px 9px; background: #fff; color: #172033; }
+    .filter-hint, .mapping-help { grid-column: 1 / -1; margin: 0; color: #64748b; font-size: .85rem; }
+    .mapping-panel { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+    .mapping-title { grid-column: 1 / -1; margin: 0; font-size: 1rem; }
+    .stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+    .stat-card { min-height: 108px; padding: 17px 19px; border-top: 4px solid #2563eb; }
+    .stat-card.infrastructure { border-top-color: #f59e0b; }
+    .stat-card.corrected { border-top-color: #10b981; }
+    .stat-card.date-card { border-top-color: #8b5cf6; }
+    .stat-label { color: #64748b; font-size: .86rem; }
+    .stat-value { margin-top: 9px; font-size: clamp(1.45rem, 3vw, 2rem); font-weight: 750; }
+    .stat-date-value { font-size: 1.15rem; }
+    .charts-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .panel { min-width: 0; padding: 18px; }
+    .wide { grid-column: 1 / -1; }
+    .panel-header { min-height: 30px; margin-bottom: 14px; }
+    .chart-wrap { position: relative; height: 300px; }
+    .pie-chart-wrap { height: 300px; }
+    .summary-box { margin-top: 12px; border-radius: 8px; padding: 10px 12px; background: #f5f7fb; color: #526078; font-size: .86rem; line-height: 1.5; }
+    .table-header-actions { justify-content: flex-end; flex-wrap: wrap; }
+    .table-filter { min-width: 170px; }
+    .table-wrap { max-height: 440px; overflow: auto; border: 1px solid #e2e8f0; border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    th, td { padding: 9px 11px; border-bottom: 1px solid #e8edf4; text-align: left; white-space: nowrap; }
+    th { position: sticky; top: 0; z-index: 1; background: #f1f5f9; color: #334155; }
+    tbody tr:hover { background: #f8fafc; }
+    .image-panel { margin-top: 16px; }
+    .image-preview-area { min-height: 130px; display: grid; place-items: center; overflow: hidden; border: 1px dashed #cbd5e1; border-radius: 9px; background: #f8fafc; }
+    .image-preview-area img { display: block; max-width: 100%; max-height: 520px; object-fit: contain; }
+    .image-preview-area img[hidden], [hidden] { display: none !important; }
+    .placeholder { padding: 25px; color: #64748b; text-align: center; }
+
+    @media (max-width: 820px) {
+      .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .charts-grid { grid-template-columns: 1fr; }
+      .wide { grid-column: auto; }
+    }
+    @media (max-width: 560px) {
+      .container { width: min(100% - 20px, 1440px); padding-top: 18px; }
+      .topbar, .split-row { align-items: flex-start; flex-direction: column; }
+      .actions, .image-actions { width: 100%; }
+      .actions > *, .image-actions > * { flex: 1; justify-content: center; }
+      .stats-grid { gap: 9px; }
+      .stat-card { min-height: 94px; padding: 13px; }
+      .table-header-actions { width: 100%; justify-content: flex-start; }
+      .table-filter { flex: 1; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <header class="topbar">
+      <div class="title-wrap">
+        <h1>Análise de Incidentes de Impactos</h1>
+      </div>
+      <div class="actions">
+        <label class="file-upload">
+          <input id="fileInput" type="file" accept=".csv,.xlsx,.xls">
+          <span>Importar planilha</span>
+        </label>
+        <button id="clearDataBtn" class="secondary-btn" type="button">Limpar dados</button>
+      </div>
+    </header>
+
+    <p id="statusMessage" class="notice" role="status" aria-live="polite">Importe um arquivo CSV ou Excel para iniciar. Os dados são processados localmente no seu navegador.</p>
+
+    <section id="mappingPanel" class="mapping-panel card" hidden aria-labelledby="mappingTitle">
+      <h2 id="mappingTitle" class="mapping-title">Mapeamento das colunas</h2>
+      <p class="mapping-help">Confira as colunas identificadas. Ajuste os campos se os nomes da sua planilha forem diferentes.</p>
+      <div class="filter-group"><label for="mapUf">UF</label><select id="mapUf"></select></div>
+      <div class="filter-group"><label for="mapSite">Tipo de site</label><select id="mapSite"></select></div>
+      <div class="filter-group"><label for="mapImpact">Tipo de impacto</label><select id="mapImpact"></select></div>
+      <div class="filter-group"><label for="mapIncident">Identificador do incidente</label><select id="mapIncident"></select></div>
+      <div class="filter-group"><label for="mapDate">Data do incidente</label><select id="mapDate"></select></div>
+      <div class="filter-group"><label for="mapStatus">Status / situação</label><select id="mapStatus"></select></div>
+      <p id="mappingHint" class="mapping-help"></p>
+    </section>
+
+    <section class="filters-panel card" aria-label="Filtros do dashboard">
+      <div class="filter-group"><label for="ufFilter">UF</label><select id="ufFilter" disabled><option value="all">Todas as UFs</option></select></div>
+      <div class="filter-group"><label for="siteTypeFilter">Tipo de site</label><select id="siteTypeFilter" disabled><option value="all">Todos</option></select></div>
+      <div class="filter-group"><label for="impactFilter">Tipo de impacto</label><select id="impactFilter" disabled><option value="all">Todos</option></select></div>
+      <div class="filter-group"><label for="dateFromFilter">Data inicial</label><input id="dateFromFilter" type="date" disabled></div>
+      <div class="filter-group"><label for="dateToFilter">Data final</label><input id="dateToFilter" type="date" disabled></div>
+      <p id="dateFilterHint" class="filter-hint">Importe uma planilha e selecione a coluna de data para habilitar o filtro por período.</p>
+    </section>
+
+    <section class="stats-grid" aria-label="Indicadores">
+      <article class="stat-card impact"><div class="stat-label">Total de impactos</div><div id="totalImpactos" class="stat-value">0</div></article>
+      <article class="stat-card infrastructure"><div class="stat-label">Incidentes de infraestrutura</div><div id="totalInfra" class="stat-value">0</div></article>
+      <article class="stat-card corrected"><div class="stat-label">Incidentes corrigidos</div><div id="totalCorrigidos" class="stat-value">0</div></article>
+      <article class="stat-card date-card"><div class="stat-label">Data de atualização</div><div id="deviceDateValue" class="stat-value stat-date-value"></div></article>
+    </section>
+
+    <section class="charts-grid" aria-label="Gráficos e dados analíticos">
+      <article class="panel chart-panel">
+        <div class="panel-header"><h2>Contagem de impactos por UF</h2></div>
+        <div class="chart-wrap pie-chart-wrap"><canvas id="impactByUfChart" aria-label="Gráfico de impactos por UF"></canvas></div>
+        <div class="summary-box" id="summaryImpactByUf">Sem dados.</div>
+      </article>
+      <article class="panel chart-panel">
+        <div class="panel-header"><h2>Tipos de impacto</h2></div>
+        <div class="chart-wrap"><canvas id="impactTypesChart" aria-label="Gráfico de tipos de impacto"></canvas></div>
+        <div class="summary-box" id="summaryImpactTypes">Sem dados.</div>
+      </article>
+      <article class="panel chart-panel">
+        <div class="panel-header"><h2>Incidentes únicos de infraestrutura por UF</h2></div>
+        <div class="chart-wrap"><canvas id="uniqueInfraByUfChart" aria-label="Gráfico de incidentes de infraestrutura por UF"></canvas></div>
+        <div class="summary-box" id="summaryUniqueInfraByUf">Sem dados.</div>
+      </article>
+      <article class="panel chart-panel">
+        <div class="panel-header"><h2>Impacto por tipo de site</h2></div>
+        <div class="chart-wrap"><canvas id="impactBySiteChart" aria-label="Gráfico de impacto por tipo de site"></canvas></div>
+        <div class="summary-box" id="summaryImpactBySite">Sem dados.</div>
+      </article>
+      <article class="panel chart-panel wide">
+        <div class="panel-header"><h2>Impactos e incidentes únicos de infraestrutura por UF</h2></div>
+        <div class="chart-wrap"><canvas id="impactVsInfraChart" aria-label="Comparação de impactos e incidentes de infraestrutura por UF"></canvas></div>
+        <div class="summary-box" id="summaryImpactVsInfra">Sem dados.</div>
+      </article>
+      <article class="panel table-panel wide">
+        <div class="panel-header split-row">
+          <h2>Analítico</h2>
+          <div class="table-header-actions">
+            <button id="exportAnalyticalBtn" class="export-btn" type="button" disabled>Exportar CSV</button>
+            <div class="filter-group table-filter"><label for="tableUfFilter">Filtrar tabela por UF</label><select id="tableUfFilter" disabled><option value="all">Todas as UFs</option></select></div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead id="infraTableHead"></thead>
+            <tbody id="infraTableBody"><tr><td>Importe uma planilha para ver os dados.</td></tr></tbody>
+          </table>
+        </div>
+        <div class="summary-box" id="summaryInfraTable">Nenhuma linha carregada.</div>
+      </article>
+    </section>
+
+    <section class="panel image-panel">
+      <div class="panel-header split-row">
+        <h2>Imagem de apoio</h2>
+        <div class="image-actions">
+          <label class="file-upload image-upload"><input id="imageInput" type="file" accept="image/*"><span>Importar imagem</span></label>
+          <button id="clearImageBtn" class="secondary-btn" type="button">Limpar imagem</button>
+        </div>
+      </div>
+      <div class="image-preview-area">
+        <img id="uploadedImage" alt="Imagem importada" hidden>
+        <div id="noImagePlaceholder" class="placeholder">Nenhuma imagem importada.</div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const state = {
+        headers: [],
+        rows: [],
+        mapping: { uf: -1, site: -1, impact: -1, incident: -1, date: -1, status: -1 },
+        charts: {},
+        imageUrl: null
+      };
+
+      const $ = (id) => document.getElementById(id);
+      const numberFormat = new Intl.NumberFormat("pt-BR");
+      const dateFormat = new Intl.DateTimeFormat("pt-BR", { dateStyle: "long" });
+      const colors = ["#2563eb", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444", "#06b6d4", "#ec4899", "#64748b", "#84cc16", "#f97316"];
+
+      function setStatus(message, type = "info") {
+        const status = $("statusMessage");
+        status.textContent = message;
+        status.className = `notice${type === "error" ? " error" : type === "warning" ? " warning" : ""}`;
+      }
+
+      function normalize(value) {
+        return String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+      }
+
+      function parseCsv(text) {
+        const firstLine = text.split(/\r?\n/, 1)[0] || "";
+        const delimiters = [",", ";", "\t"];
+        let delimiter = ",";
+        let highestCount = -1;
+        for (const candidate of delimiters) {
+          let count = 0;
+          let quoted = false;
+          for (let i = 0; i < firstLine.length; i += 1) {
+            if (firstLine[i] === '"') {
+              if (quoted && firstLine[i + 1] === '"') i += 1;
+              else quoted = !quoted;
+            } else if (firstLine[i] === candidate && !quoted) count += 1;
+          }
+          if (count > highestCount) {
+            highestCount = count;
+            delimiter = candidate;
+          }
+        }
+
+        const records = [];
+        let row = [];
+        let value = "";
+        let quoted = false;
+        for (let i = 0; i < text.length; i += 1) {
+          const char = text[i];
+          if (char === '"') {
+            if (quoted && text[i + 1] === '"') {
+              value += '"';
+              i += 1;
+            } else {
+              quoted = !quoted;
+            }
+          } else if (char === delimiter && !quoted) {
+            row.push(value);
+            value = "";
+          } else if ((char === "\n" || char === "\r") && !quoted) {
+            if (char === "\r" && text[i + 1] === "\n") i += 1;
+            row.push(value);
+            if (row.some((cell) => cell.trim() !== "")) records.push(row);
+            row = [];
+            value = "";
+          } else {
+            value += char;
+          }
+        }
+        row.push(value);
+        if (row.some((cell) => cell.trim() !== "")) records.push(row);
+        if (records.length < 2) throw new Error("O CSV precisa conter uma linha de cabeçalho e pelo menos uma linha de dados.");
+
+        const headers = records[0].map((header, index) => {
+          const clean = header.replace(/^\uFEFF/, "").trim();
+          return clean || `Coluna ${index + 1}`;
+        });
+        const rows = records.slice(1).map((record) => {
+          const result = {};
+          headers.forEach((header, index) => { result[header] = String(record[index] ?? "").trim(); });
+          return result;
+        });
+        return { headers, rows };
+      }
+
+      async function readFile(file) {
+        const extension = file.name.split(".").pop().toLowerCase();
+        if (extension === "csv") {
+          const text = await file.text();
+          return parseCsv(text.replace(/^\uFEFF/, ""));
+        }
+        if (extension !== "xls" && extension !== "xlsx") throw new Error("Formato não suportado. Selecione um arquivo CSV, XLS ou XLSX.");
+        if (!window.XLSX) throw new Error("A biblioteca de leitura Excel não carregou. Verifique a conexão e recarregue a página; arquivos CSV continuam disponíveis.");
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        if (!firstSheet) throw new Error("A planilha não contém uma aba com dados.");
+        const matrix = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: "", raw: false });
+        const nonEmpty = matrix.filter((row) => row.some((cell) => String(cell).trim() !== ""));
+        if (nonEmpty.length < 2) throw new Error("A planilha precisa conter um cabeçalho e pelo menos uma linha de dados.");
+        const headers = nonEmpty[0].map((header, index) => String(header).trim() || `Coluna ${index + 1}`);
+        const rows = nonEmpty.slice(1).map((record) => {
+          const result = {};
+          headers.forEach((header, index) => { result[header] = record[index] ?? ""; });
+          return result;
+        });
+        return { headers, rows };
+      }
+
+      const aliases = {
+        uf: ["uf", "estado", "unidade federativa", "sigla uf"],
+        site: ["tipo de site", "site", "tipo site", "site type", "tipo do site"],
+        impact: ["tipo de impacto", "impacto", "tipo impacto", "impact", "impact type", "servico impactado", "servico afetado"],
+        incident: ["id incidente", "incidente", "numero do incidente", "numero incidente", "protocolo", "ticket", "chamado", "id", "incident id"],
+        date: ["data", "data do incidente", "data incidente", "abertura", "data de abertura", "inicio", "data inicio", "created at", "date"],
+        status: ["status", "situacao", "resolucao", "status do incidente", "situacao do incidente"]
+      };
+
+      function inferMapping(headers) {
+        const normalizedHeaders = headers.map(normalize);
+        const result = {};
+        for (const [field, candidates] of Object.entries(aliases)) {
+          let index = normalizedHeaders.findIndex((header) => candidates.includes(header));
+          if (index < 0) index = normalizedHeaders.findIndex((header) => candidates.some((candidate) => header.includes(candidate)));
+          result[field] = index;
+        }
+        return result;
+      }
+
+      function buildMappingControls() {
+        const labels = { uf: "UF", site: "Tipo de site", impact: "Tipo de impacto", incident: "Identificador do incidente", date: "Data do incidente", status: "Status / situação" };
+        for (const field of Object.keys(labels)) {
+          const select = $(`map${field[0].toUpperCase()}${field.slice(1)}`);
+          select.replaceChildren();
+          const optional = document.createElement("option");
+          optional.value = "-1";
+          optional.textContent = field === "incident" || field === "date" || field === "status" ? "Não usar" : "Não identificada";
+          select.append(optional);
+          state.headers.forEach((header, index) => {
+            const option = document.createElement("option");
+            option.value = String(index);
+            option.textContent = header;
+            select.append(option);
+          });
+          select.value = String(state.mapping[field]);
+          select.onchange = () => {
+            state.mapping[field] = Number(select.value);
+            updateDashboard();
+          };
+        }
+        $("mappingPanel").hidden = false;
+        const unavailable = Object.keys(labels).filter((field) => state.mapping[field] < 0 && ["uf", "site", "impact"].includes(field));
+        $("mappingHint").textContent = unavailable.length
+          ? `Não foi possível identificar automaticamente: ${unavailable.map((field) => labels[field]).join(", ")}. Escolha as colunas correspondentes, se existirem.`
+          : "Os nomes das colunas foram reconhecidos. Você pode alterar o mapeamento a qualquer momento.";
+      }
+
+      function mappedValue(row, field) {
+        const index = state.mapping[field];
+        if (index < 0 || !state.headers[index]) return "";
+        return String(row[state.headers[index]] ?? "").trim();
+      }
+
+      function parseDate(value) {
+        if (value instanceof Date && !Number.isNaN(value.getTime())) return new Date(Date.UTC(value.getFullYear(), value.getMonth(), value.getDate()));
+        const text = String(value ?? "").trim();
+        if (!text) return null;
+        let match = text.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})/);
+        if (match) {
+          let year = Number(match[3]);
+          if (year < 100) year += year < 50 ? 2000 : 1900;
+          const date = new Date(Date.UTC(year, Number(match[2]) - 1, Number(match[1])));
+          return date.getUTCFullYear() === year && date.getUTCMonth() === Number(match[2]) - 1 && date.getUTCDate() === Number(match[1]) ? date : null;
+        }
+        match = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (match) return new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+        const parsed = new Date(text);
+        return Number.isNaN(parsed.getTime()) ? null : new Date(Date.UTC(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()));
+      }
+
+      function rowDate(row) {
+        return parseDate(mappedValue(row, "date"));
+      }
+
+      function isInfrastructure(row) {
+        const text = `${mappedValue(row, "site")} ${mappedValue(row, "impact")}`.toLowerCase();
+        return /infra|infraestrutura|infrastructure/.test(text);
+      }
+
+      function isCorrected(row) {
+        return /corrigid|resolvid|concluid|finalizad|normalizad|encerrad|restabelecid/.test(normalize(mappedValue(row, "status")));
+      }
+
+      function uniqueCount(rows) {
+        const index = state.mapping.incident;
+        if (index < 0) return rows.length;
+        const header = state.headers[index];
+        return new Set(rows.map((row, rowIndex) => String(row[header] ?? "").trim() || `__linha_${rowIndex}`)).size;
+      }
+
+      function selectedRows(includeTableUf = false) {
+        const from = $("dateFromFilter").value ? new Date(`${$("dateFromFilter").value}T00:00:00Z`) : null;
+        const to = $("dateToFilter").value ? new Date(`${$("dateToFilter").value}T00:00:00Z`) : null;
+        return state.rows.filter((row) => {
+          if ($("ufFilter").value !== "all" && mappedValue(row, "uf") !== $("ufFilter").value) return false;
+          if ($("siteTypeFilter").value !== "all" && mappedValue(row, "site") !== $("siteTypeFilter").value) return false;
+          if ($("impactFilter").value !== "all" && mappedValue(row, "impact") !== $("impactFilter").value) return false;
+          if (from || to) {
+            const date = rowDate(row);
+            if (!date || (from && date < from) || (to && date > to)) return false;
+          }
+          if (includeTableUf && $("tableUfFilter").value !== "all" && mappedValue(row, "uf") !== $("tableUfFilter").value) return false;
+          return true;
+        });
+      }
+
+      function setOptions(select, values, allLabel) {
+        const previous = select.value;
+        select.replaceChildren();
+        const all = document.createElement("option");
+        all.value = "all";
+        all.textContent = allLabel;
+        select.append(all);
+        values.forEach((value) => {
+          const option = document.createElement("option");
+          option.value = value;
+          option.textContent = value;
+          select.append(option);
+        });
+        select.value = values.includes(previous) ? previous : "all";
+        select.disabled = values.length === 0;
+      }
+
+      function countBy(rows, field) {
+        const counts = new Map();
+        for (const row of rows) {
+          const value = mappedValue(row, field) || "Não informado";
+          counts.set(value, (counts.get(value) || 0) + 1);
+        }
+        return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+      }
+
+      function uniqueInfraByUf(rows) {
+        const groups = new Map();
+        rows.forEach((row, index) => {
+          if (!isInfrastructure(row)) return;
+          const uf = mappedValue(row, "uf") || "Não informado";
+          if (!groups.has(uf)) groups.set(uf, new Set());
+          const incident = mappedValue(row, "incident") || `__linha_${index}`;
+          groups.get(uf).add(incident);
+        });
+        return [...groups.entries()].map(([uf, incidents]) => [uf, incidents.size]).sort((a, b) => b[1] - a[1]);
+      }
+
+      function renderChart(id, config) {
+        const canvas = $(id);
+        if (!window.Chart) {
+          setStatus("A biblioteca de gráficos não carregou. Confira a conexão e recarregue a página; a importação e a tabela continuam disponíveis.", "warning");
+          return;
+        }
+        if (state.charts[id]) state.charts[id].destroy();
+        state.charts[id] = new Chart(canvas, config);
+      }
+
+      function chartOptions(indexAxis = "x") {
+        return {
+          responsive: true,
+          maintainAspectRatio: false,
+          indexAxis,
+          plugins: { legend: { display: indexAxis === "x" } },
+          scales: indexAxis === "y" ? { x: { beginAtZero: true, ticks: { precision: 0 } } } : { y: { beginAtZero: true, ticks: { precision: 0 } } }
+        };
+      }
+
+      function renderCharts(rows) {
+        const uf = countBy(rows, "uf");
+        const impacts = countBy(rows, "impact");
+        const sites = countBy(rows, "site");
+        const infra = uniqueInfraByUf(rows);
+        const labels = (entries) => entries.map(([label]) => label);
+        const values = (entries) => entries.map(([, value]) => value);
+
+        renderChart("impactByUfChart", {
+          type: "doughnut",
+          data: { labels: labels(uf), datasets: [{ data: values(uf), backgroundColor: colors }] },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "bottom" } } }
+        });
+        renderChart("impactTypesChart", {
+          type: "bar",
+          data: { labels: labels(impacts), datasets: [{ label: "Impactos", data: values(impacts), backgroundColor: colors[0] }] },
+          options: chartOptions("y")
+        });
+        renderChart("uniqueInfraByUfChart", {
+          type: "bar",
+          data: { labels: labels(infra), datasets: [{ label: "Incidentes únicos", data: values(infra), backgroundColor: colors[1] }] },
+          options: chartOptions("y")
+        });
+        renderChart("impactBySiteChart", {
+          type: "bar",
+          data: { labels: labels(sites), datasets: [{ label: "Impactos", data: values(sites), backgroundColor: colors[2] }] },
+          options: chartOptions("y")
+        });
+        renderChart("impactVsInfraChart", {
+          type: "bar",
+          data: {
+            labels: labels(uf),
+            datasets: [
+              { label: "Impactos", data: values(uf), backgroundColor: colors[0] },
+              { label: "Incidentes únicos de infraestrutura", data: labels(uf).map((name) => infra.find(([ufName]) => ufName === name)?.[1] || 0), backgroundColor: colors[1] }
+            ]
+          },
+          options: { ...chartOptions(), scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+        });
+
+        $("summaryImpactByUf").textContent = uf.length ? `UF com mais impactos: ${uf[0][0]} (${numberFormat.format(uf[0][1])}).` : "Sem dados para exibir.";
+        $("summaryImpactTypes").textContent = impacts.length ? `Tipo mais frequente: ${impacts[0][0]} (${numberFormat.format(impacts[0][1])}).` : "Sem dados para exibir.";
+        $("summaryUniqueInfraByUf").textContent = infra.length ? `UF com mais incidentes únicos de infraestrutura: ${infra[0][0]} (${numberFormat.format(infra[0][1])}).` : "Nenhum incidente de infraestrutura identificado nos campos mapeados.";
+        $("summaryImpactBySite").textContent = sites.length ? `Tipo de site mais impactado: ${sites[0][0]} (${numberFormat.format(sites[0][1])}).` : "Sem dados para exibir.";
+        $("summaryImpactVsInfra").textContent = uf.length ? `${numberFormat.format(rows.length)} impactos em ${numberFormat.format(uf.length)} categorias de UF.` : "Sem dados para exibir.";
+      }
+
+      function renderTable(rows) {
+        const head = $("infraTableHead");
+        const body = $("infraTableBody");
+        head.replaceChildren();
+        body.replaceChildren();
+        if (!state.headers.length) {
+          body.innerHTML = "<tr><td>Importe uma planilha para ver os dados.</td></tr>";
+          return;
+        }
+        const headerRow = document.createElement("tr");
+        state.headers.forEach((header) => {
+          const cell = document.createElement("th");
+          cell.scope = "col";
+          cell.textContent = header;
+          headerRow.append(cell);
+        });
+        head.append(headerRow);
+        const maxRows = 1000;
+        rows.slice(0, maxRows).forEach((row) => {
+          const tr = document.createElement("tr");
+          state.headers.forEach((header) => {
+            const cell = document.createElement("td");
+            cell.textContent = String(row[header] ?? "");
+            tr.append(cell);
+          });
+          body.append(tr);
+        });
+        if (!rows.length) body.innerHTML = `<tr><td colspan="${state.headers.length}">Nenhum registro corresponde aos filtros.</td></tr>`;
+        const shown = Math.min(rows.length, maxRows);
+        $("summaryInfraTable").textContent = `Linhas exibidas: ${numberFormat.format(shown)} de ${numberFormat.format(rows.length)}${rows.length > maxRows ? " (limite visual de 1.000 linhas; a exportação inclui todos os resultados)" : ""}.`;
+      }
+
+      function updateDashboard() {
+        const hasData = state.rows.length > 0;
+        for (const id of ["ufFilter", "siteTypeFilter", "impactFilter", "tableUfFilter"]) $(id).disabled = !hasData;
+        const dateIndex = state.mapping.date;
+        $("dateFromFilter").disabled = !hasData || dateIndex < 0;
+        $("dateToFilter").disabled = !hasData || dateIndex < 0;
+        $("dateFilterHint").textContent = dateIndex < 0
+          ? "Mapeie uma coluna de data para filtrar por período. Registros sem data reconhecida não podem ser filtrados por data."
+          : "O filtro por período considera os registros com data válida.";
+        if (!hasData) {
+          ["totalImpactos", "totalInfra", "totalCorrigidos"].forEach((id) => { $(id).textContent = "0"; });
+          renderTable([]);
+          return;
+        }
+
+        const uniqueValues = (field) => state.mapping[field] < 0
+          ? []
+          : [...new Set(state.rows.map((row) => mappedValue(row, field)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt-BR"));
+        setOptions($("ufFilter"), uniqueValues("uf"), "Todas as UFs");
+        setOptions($("tableUfFilter"), uniqueValues("uf"), "Todas as UFs");
+        setOptions($("siteTypeFilter"), uniqueValues("site"), "Todos");
+        setOptions($("impactFilter"), uniqueValues("impact"), "Todos");
+
+        const rows = selectedRows();
+        $("totalImpactos").textContent = numberFormat.format(rows.length);
+        $("totalInfra").textContent = numberFormat.format(uniqueCount(rows.filter(isInfrastructure)));
+        $("totalCorrigidos").textContent = numberFormat.format(uniqueCount(rows.filter(isCorrected)));
+        renderCharts(rows);
+        renderTable(selectedRows(true));
+        $("exportAnalyticalBtn").disabled = selectedRows(true).length === 0;
+      }
+
+      function csvCell(value) {
+        const text = String(value ?? "");
+        return `"${text.replace(/"/g, '""')}"`;
+      }
+
+      function exportCsv() {
+        const rows = selectedRows(true);
+        if (!rows.length) {
+          setStatus("Não há linhas para exportar com os filtros atuais.", "warning");
+          return;
+        }
+        const csv = [state.headers.map(csvCell).join(";"), ...rows.map((row) => state.headers.map((header) => csvCell(row[header])).join(";"))].join("\r\n");
+        const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "analise-de-incidentes.csv";
+        link.click();
+        URL.revokeObjectURL(url);
+      }
+
+      function clearData() {
+        state.headers = [];
+        state.rows = [];
+        state.mapping = { uf: -1, site: -1, impact: -1, incident: -1, date: -1, status: -1 };
+        $("fileInput").value = "";
+        $("mappingPanel").hidden = true;
+        $("mappingHint").textContent = "";
+        $("dateFromFilter").value = "";
+        $("dateToFilter").value = "";
+        ["ufFilter", "siteTypeFilter", "impactFilter", "tableUfFilter"].forEach((id) => {
+          const select = $(id);
+          select.replaceChildren(new Option(id === "ufFilter" || id === "tableUfFilter" ? "Todas as UFs" : "Todos", "all"));
+          select.disabled = true;
+        });
+        Object.values(state.charts).forEach((chart) => chart.destroy());
+        state.charts = {};
+        ["totalImpactos", "totalInfra", "totalCorrigidos"].forEach((id) => { $(id).textContent = "0"; });
+        $("exportAnalyticalBtn").disabled = true;
+        $("infraTableHead").replaceChildren();
+        $("infraTableBody").innerHTML = "<tr><td>Importe uma planilha para ver os dados.</td></tr>";
+        $("summaryInfraTable").textContent = "Nenhuma linha carregada.";
+        ["summaryImpactByUf", "summaryImpactTypes", "summaryUniqueInfraByUf", "summaryImpactBySite", "summaryImpactVsInfra"].forEach((id) => { $(id).textContent = "Sem dados."; });
+        setStatus("Dados removidos. Importe um arquivo CSV ou Excel para iniciar. Os dados são processados localmente no seu navegador.");
+      }
+
+      $("fileInput").addEventListener("change", async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        try {
+          const result = await readFile(file);
+          state.headers = result.headers;
+          state.rows = result.rows;
+          state.mapping = inferMapping(state.headers);
+          buildMappingControls();
+          $("dateFromFilter").value = "";
+          $("dateToFilter").value = "";
+          updateDashboard();
+          setStatus(`${file.name}: ${numberFormat.format(state.rows.length)} linhas carregadas. Confira o mapeamento das colunas antes de interpretar os indicadores.`);
+        } catch (error) {
+          setStatus(error instanceof Error ? error.message : "Não foi possível ler o arquivo selecionado.", "error");
+        }
+      });
+
+      ["ufFilter", "siteTypeFilter", "impactFilter", "dateFromFilter", "dateToFilter", "tableUfFilter"].forEach((id) => {
+        $(id).addEventListener("change", updateDashboard);
+      });
+      $("clearDataBtn").addEventListener("click", clearData);
+      $("exportAnalyticalBtn").addEventListener("click", exportCsv);
+
+      $("imageInput").addEventListener("change", (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith("image/")) {
+          setStatus("Selecione um arquivo de imagem válido.", "error");
+          event.target.value = "";
+          return;
+        }
+        if (state.imageUrl) URL.revokeObjectURL(state.imageUrl);
+        state.imageUrl = URL.createObjectURL(file);
+        $("uploadedImage").src = state.imageUrl;
+        $("uploadedImage").hidden = false;
+        $("noImagePlaceholder").hidden = true;
+      });
+      $("clearImageBtn").addEventListener("click", () => {
+        if (state.imageUrl) URL.revokeObjectURL(state.imageUrl);
+        state.imageUrl = null;
+        $("imageInput").value = "";
+        $("uploadedImage").removeAttribute("src");
+        $("uploadedImage").hidden = true;
+        $("noImagePlaceholder").hidden = false;
+      });
+      $("deviceDateValue").textContent = dateFormat.format(new Date());
+    })();
+  </script>
+</body>
+</html>
