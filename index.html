@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Dashboard interativo para análise de incidentes e impactos.">
-  <title>Dashboard de Análise de Incidentes</title>
+  <title>Dashboard de Análise de Incidentes e Infraestrutura</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
@@ -12,7 +12,7 @@
       color-scheme: light;
       font-family: Inter, "Segoe UI", Arial, sans-serif;
       color: #172033;
-      background: #f3f6fb;
+      background: #f1f1f1;
       font-synthesis: none;
     }
 
@@ -21,27 +21,28 @@
     button, input, select { font: inherit; }
     button, .file-upload { cursor: pointer; }
     button:disabled { cursor: not-allowed; opacity: .55; }
-    .container { width: min(1440px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 40px; }
+    .container { width: min(1440px, calc(100% - 16px)); margin: 0 auto; padding: 8px 0 32px; }
     .topbar, .panel-header, .split-row, .actions, .image-actions, .table-header-actions {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 16px;
     }
-    .topbar { margin-bottom: 22px; }
-    h1 { margin: 0; font-size: clamp(1.45rem, 3vw, 2rem); }
+    .topbar { min-height: 56px; margin-bottom: 14px; padding: 10px 15px; border: 1px solid #dedede; border-radius: 12px; background: #fff; box-shadow: 0 2px 6px #0000000d; }
+    .title-wrap { flex: 1; min-width: 0; }
+    h1 { margin: 0; font-size: clamp(1.05rem, 2.25vw, 1.45rem); white-space: nowrap; }
     h2 { margin: 0; font-size: 1.05rem; }
     .actions, .image-actions { flex-wrap: wrap; }
     .file-upload, button {
-      min-height: 40px;
+      min-height: 34px;
       border: 1px solid #cbd5e1;
-      border-radius: 9px;
-      padding: 9px 14px;
+      border-radius: 8px;
+      padding: 7px 12px;
       background: #fff;
       color: #26334b;
       font-weight: 600;
     }
-    .file-upload { display: inline-flex; align-items: center; background: #2563eb; border-color: #2563eb; color: #fff; }
+    .file-upload { display: inline-flex; align-items: center; background: #2596ce; border-color: #2596ce; color: #fff; box-shadow: 0 3px 8px #2596ce33; }
     .file-upload input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
     .file-upload:focus-within, button:focus-visible, input:focus-visible, select:focus-visible {
       outline: 3px solid #93c5fd;
@@ -49,32 +50,33 @@
     }
     .secondary-btn { background: #fff; }
     .export-btn { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
-    .notice { margin: 0 0 18px; border: 1px solid #bfdbfe; border-radius: 9px; padding: 11px 14px; background: #eff6ff; color: #1e3a8a; }
+    .notice { margin: 0 4px 8px; border: 0; padding: 3px 10px; background: transparent; color: #64748b; font-size: .78rem; }
     .notice.error { border-color: #fecaca; background: #fef2f2; color: #991b1b; }
     .notice.warning { border-color: #fde68a; background: #fffbeb; color: #854d0e; }
-    .card, .panel, .stat-card { border: 1px solid #e1e7f0; border-radius: 13px; background: #fff; box-shadow: 0 3px 12px #1720330a; }
-    .filters-panel, .mapping-panel { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; padding: 18px; margin-bottom: 18px; }
+    .card, .panel, .stat-card { border: 1px solid #dedede; border-radius: 12px; background: #fff; box-shadow: 0 2px 7px #0000000c; }
+    .filters-panel, .mapping-panel { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; padding: 13px; margin-bottom: 15px; }
     .filter-group { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
     .filter-group label { color: #566176; font-size: .82rem; font-weight: 650; }
-    select, input[type="date"] { width: 100%; min-height: 39px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 7px 9px; background: #fff; color: #172033; }
-    .filter-hint, .mapping-help { grid-column: 1 / -1; margin: 0; color: #64748b; font-size: .85rem; }
+    select, input[type="date"] { width: 100%; min-height: 34px; border: 1px solid #d5d5d5; border-radius: 8px; padding: 6px 9px; background: #fff; color: #172033; font-size: .83rem; }
+    .filter-hint, .mapping-help { grid-column: 1 / -1; margin: -4px 0 0; color: #777; font-size: .76rem; }
     .mapping-panel { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
     .mapping-title { grid-column: 1 / -1; margin: 0; font-size: 1rem; }
-    .stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
-    .stat-card { min-height: 108px; padding: 17px 19px; border-top: 4px solid #2563eb; }
-    .stat-card.infrastructure { border-top-color: #f59e0b; }
-    .stat-card.corrected { border-top-color: #10b981; }
-    .stat-card.date-card { border-top-color: #8b5cf6; }
-    .stat-label { color: #64748b; font-size: .86rem; }
-    .stat-value { margin-top: 9px; font-size: clamp(1.45rem, 3vw, 2rem); font-weight: 750; }
-    .stat-date-value { font-size: 1.15rem; }
+    .stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 15px; }
+    .stat-card { min-height: 104px; padding: 17px 12px; border: 0; color: #fff; }
+    .stat-card.impact { background: linear-gradient(135deg, #d52d30, #bd171c); }
+    .stat-card.infrastructure { background: linear-gradient(135deg, #f39a16, #df8100); }
+    .stat-card.corrected { background: linear-gradient(135deg, #26a86b, #178f59); }
+    .stat-label { color: #fff; font-size: .82rem; font-weight: 650; }
+    .stat-value { margin-top: 7px; font-size: clamp(1.8rem, 3vw, 2.35rem); font-weight: 780; }
     .charts-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-    .panel { min-width: 0; padding: 18px; }
+    .panel { min-width: 0; padding: 13px; }
     .wide { grid-column: 1 / -1; }
-    .panel-header { min-height: 30px; margin-bottom: 14px; }
-    .chart-wrap { position: relative; height: 300px; }
-    .pie-chart-wrap { height: 300px; }
-    .summary-box { margin-top: 12px; border-radius: 8px; padding: 10px 12px; background: #f5f7fb; color: #526078; font-size: .86rem; line-height: 1.5; }
+    .panel-header { min-height: 24px; margin-bottom: 8px; }
+    .panel-header h2 { font-size: .88rem; }
+    .chart-wrap { position: relative; height: 240px; }
+    .pie-chart-wrap { height: 240px; }
+    canvas { max-width: 100%; }
+    .summary-box { margin-top: 8px; border: 1px solid #e3e3e3; border-radius: 8px; padding: 8px 10px; background: #fafafa; color: #526078; font-size: .8rem; line-height: 1.45; }
     .table-header-actions { justify-content: flex-end; flex-wrap: wrap; }
     .table-filter { min-width: 170px; }
     .table-wrap { max-height: 440px; overflow: auto; border: 1px solid #e2e8f0; border-radius: 8px; }
@@ -89,19 +91,30 @@
     .placeholder { padding: 25px; color: #64748b; text-align: center; }
 
     @media (max-width: 820px) {
-      .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .charts-grid { grid-template-columns: 1fr; }
+      .filters-panel { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .stats-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .charts-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .wide { grid-column: auto; }
     }
     @media (max-width: 560px) {
-      .container { width: min(100% - 20px, 1440px); padding-top: 18px; }
+      .container { width: min(100% - 12px, 1440px); padding-top: 6px; }
       .topbar, .split-row { align-items: flex-start; flex-direction: column; }
       .actions, .image-actions { width: 100%; }
       .actions > *, .image-actions > * { flex: 1; justify-content: center; }
-      .stats-grid { gap: 9px; }
-      .stat-card { min-height: 94px; padding: 13px; }
+      .filters-panel { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+      .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+      .stat-card { min-height: 90px; padding: 13px; }
+      .charts-grid { grid-template-columns: 1fr; }
+      .wide { grid-column: auto; }
       .table-header-actions { width: 100%; justify-content: flex-start; }
       .table-filter { flex: 1; }
+    }
+    @media (max-width: 700px) {
+      .topbar { align-items: flex-start; flex-direction: column; }
+      h1 { white-space: normal; }
+      .topbar .actions { width: 100%; flex-wrap: wrap; }
+      .charts-grid { grid-template-columns: 1fr; }
+      .wide { grid-column: auto; }
     }
   </style>
 </head>
@@ -109,14 +122,14 @@
   <main class="container">
     <header class="topbar">
       <div class="title-wrap">
-        <h1>Análise de Incidentes de Impactos</h1>
+        <h1>Dashboard de Análise de Incidentes e Infraestrutura</h1>
       </div>
       <div class="actions">
         <label class="file-upload">
           <input id="fileInput" type="file" accept=".csv,.xlsx,.xls">
-          <span>Importar planilha</span>
+          <span>Importar Excel / CSV</span>
         </label>
-        <button id="clearDataBtn" class="secondary-btn" type="button">Limpar dados</button>
+        <button id="clearDataBtn" class="secondary-btn" type="button">Limpar importação</button>
       </div>
     </header>
 
@@ -140,14 +153,13 @@
       <div class="filter-group"><label for="impactFilter">Tipo de impacto</label><select id="impactFilter" disabled><option value="all">Todos</option></select></div>
       <div class="filter-group"><label for="dateFromFilter">Data inicial</label><input id="dateFromFilter" type="date" disabled></div>
       <div class="filter-group"><label for="dateToFilter">Data final</label><input id="dateToFilter" type="date" disabled></div>
-      <p id="dateFilterHint" class="filter-hint">Importe uma planilha e selecione a coluna de data para habilitar o filtro por período.</p>
+      <p id="dateFilterHint" class="filter-hint">Análise por período usando a coluna "DIA".</p>
     </section>
 
     <section class="stats-grid" aria-label="Indicadores">
       <article class="stat-card impact"><div class="stat-label">Total de impactos</div><div id="totalImpactos" class="stat-value">0</div></article>
       <article class="stat-card infrastructure"><div class="stat-label">Incidentes de infraestrutura</div><div id="totalInfra" class="stat-value">0</div></article>
       <article class="stat-card corrected"><div class="stat-label">Incidentes corrigidos</div><div id="totalCorrigidos" class="stat-value">0</div></article>
-      <article class="stat-card date-card"><div class="stat-label">Data de atualização</div><div id="deviceDateValue" class="stat-value stat-date-value"></div></article>
     </section>
 
     <section class="charts-grid" aria-label="Gráficos e dados analíticos">
@@ -223,8 +235,7 @@
 
       const $ = (id) => document.getElementById(id);
       const numberFormat = new Intl.NumberFormat("pt-BR");
-      const dateFormat = new Intl.DateTimeFormat("pt-BR", { dateStyle: "long" });
-      const colors = ["#2563eb", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444", "#06b6d4", "#ec4899", "#64748b", "#84cc16", "#f97316"];
+      const colors = ["#e63946", "#c91820", "#f16b72", "#8f8f8f", "#696969", "#b8b8b8", "#a3a3a3", "#d94b52", "#858585", "#ef8b8f"];
 
       function setStatus(message, type = "info") {
         const status = $("statusMessage");
@@ -327,7 +338,7 @@
         site: ["tipo de site", "site", "tipo site", "site type", "tipo do site"],
         impact: ["tipo de impacto", "impacto", "tipo impacto", "impact", "impact type", "servico impactado", "servico afetado"],
         incident: ["id incidente", "incidente", "numero do incidente", "numero incidente", "protocolo", "ticket", "chamado", "id", "incident id"],
-        date: ["data", "data do incidente", "data incidente", "abertura", "data de abertura", "inicio", "data inicio", "created at", "date"],
+        date: ["data", "dia", "data do incidente", "data incidente", "abertura", "data de abertura", "inicio", "data inicio", "created at", "date"],
         status: ["status", "situacao", "resolucao", "status do incidente", "situacao do incidente"]
       };
 
@@ -690,7 +701,6 @@
         $("uploadedImage").hidden = true;
         $("noImagePlaceholder").hidden = false;
       });
-      $("deviceDateValue").textContent = dateFormat.format(new Date());
     })();
   </script>
 </body>
