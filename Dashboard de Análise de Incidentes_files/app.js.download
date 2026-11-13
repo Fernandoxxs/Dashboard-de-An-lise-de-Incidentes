@@ -142,6 +142,7 @@ function configureDateFilters() {
   els.dateFilterHint.textContent = enabled
     ? `Análise por período usando a coluna “${displayColumnName(dateField)}”.`
     : 'Esta planilha não contém uma coluna de data reconhecida; o filtro por data está indisponível.';
+  els.dateFilterHint.classList.toggle('is-visible', enabled);
 }
 
 function parseDateFilter(input) {

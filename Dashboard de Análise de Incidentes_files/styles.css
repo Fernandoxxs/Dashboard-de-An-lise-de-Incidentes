@@ -211,10 +211,15 @@ body {
 }
 
 .filter-hint {
+  display: none;
   grid-column: 1 / -1;
   margin: -8px 0 0;
   color: var(--muted);
   font-size: 0.85rem;
+}
+
+.filter-hint.is-visible {
+  display: block;
 }
 
 .stats-grid {
